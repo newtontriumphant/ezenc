@@ -632,10 +632,30 @@ def main_menu():
     while True:
         clear_screen()
         out(lblue(LOGO))
+        out(f"  {bold('1.')} Encode  {dim('- choose a method, encode any string! :3')}")
+        out(f"  {bold('2.')} Decode  {dim('- paste. anything and get it auto-decoded! :o')}")
+        out(f"  {bold('q.')} Quit :c")
+        out()
+        out(dim("  or just paste an encoded string directly! ;w;"))
+        out()
+        try:
+            choice = input(blue("  --> ")).strip()
+        except (EOFError, KeyboardInterrupt):
+            out()
+            break
+        cl = choice.lower()
+        if cl == "1":
+            encode_menu()
+        elif cl == "2":
+            decode_menu()
+        elif cl in {"q", "quit", "exit"}:
+            break
+        elif choice:
+            decode_result(choice)
 
 def main():
     signal.signal(signal.SIGINT, lambda *_: (print(), sys.exit(0)))
-    encode_menu()
+    main_menu()
 
 if __name__ == "__main__":
     main()
