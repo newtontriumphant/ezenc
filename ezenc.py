@@ -107,10 +107,128 @@ def _english_score(s: str) -> float:
     word_bonus = sum(1 for w in words if w in COMMON_WORDS) / len(words) if words else 0.0
     return bg_score * 0.6 + word_bonus * 0.4
 
+def _is_printable_str(s: str) -> bool:
+    return bool(s) and all(c.isprintable() or c in '\n\t\r' for c in s) and bool(s.strip())
+
+def _confidence(decoded: str, original:str) -> float:
+    if not _is_printable_str(decoded):
+        return 0.0
+    if decoded.strip() == original.strip():
+        return 0.0
+    score = _english_score(decoded)
+    if len(decoded) > len(original) * 3:
+        score *= 0.3
+    return score
+
+# some extra functions and matrices for finding encodings (AI was used for morse braille and zalgo (the obscure ones) as well as figuring out some more interesting ciphers to go with, the remainder is my own work.)
+
+BASE58_ALPHA = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+MORSE_ENC = {
+    'A':'.-','B':'-...','C':'-.-.','D':'-..','E':'.','F':'..-.','G':'--.','H':'....','I':'..','J':'.---',
+    'K':'-.-','L':'.-..','M':'--','N':'-.','O':'---','P':'.--.','Q':'--.-','R':'.-.','S':'...','T':'-',
+    'U':'..-','V':'...-','W':'.--','X':'-..-','Y':'-.--','Z':'--..',
+    '0':'-----','1':'.----','2':'..---','3':'...--','4':'....-','5':'.....',
+    '6':'-....','7':'--...','8':'---..','9':'----.',
+    ' ':'/','.':'.-.-.-',',':'--..--','?':'..--..','!':'-.-.--','-':'-....-',
+}
+MORSE_DEC = {v: k for k, v in MORSE_ENC.items()}
+
+# why the #ysws-fraud-fudgeudgefudge does the bacon cipher exist sob
+BACON_ENC = {c: format(i, '05b').replace('0', 'A').replace('1', 'B') for i, c in enumerate("ABCDEFGHIJKLMNOPQRSTUVWXYZ")}
+BACON_ENC['J'] = BACON_ENC['I']
+BACON_ENC['V'] = BACON_ENC['U']
+BACON_DEC = {}
+for ch, code in BACON_ENC.items():
+    if code not in BACON_DEC:
+        BACON_DEC[code] = ch
+
+BRAILLE_ENC = {
+    'a':'⠁','b':'⠃','c':'⠉','d':'⠙','e':'⠑','f':'⠋','g':'⠛','h':'⠓','i':'⠊','j':'⠚',
+    'k':'⠅','l':'⠇','m':'⠍','n':'⠝','o':'⠕','p':'⠏','q':'⠟','r':'⠗','s':'⠎','t':'⠞',
+    'u':'⠥','v':'⠧','w':'⠺','x':'⠭','y':'⠽','z':'⠵',
+    '0':'⠴','1':'⠂','2':'⠆','3':'⠒','4':'⠲','5':'⠢','6':'⠖','7':'⠶','8':'⠦','9':'⠔',' ':'⠀',
+}
+BRAILLE_DEC = {v: k for k, v in BRAILLE_ENC.items()}
+
+NATO_ENC = {
+    'A':'Alpha', 'B':'Bravo', 'C':'Charlie', 'D':'Delta', 'E':'Echo', 'F':'Foxtrot', 'G':'Golf', 'H':'Hotel',
+    'I':'India', 'J':'Juliett', 'K':'Kilo', 'L':'Lima', 'M':'Mike', 'N':'November', 'O':'Oscar', 'P':'Papa',
+    'Q':'Quebec', 'R':'Romeo', 'S':'Sierra', 'T':'Tango', 'U':'Uniform', 'V':'Victor', 'W':'Whiskey',
+    'X':'X-ray', 'Y':'Yankee', 'Z':'Zulu',
+    '0':'Zero', '1':'One', '2':'Two', '3':'Three', '4':'Four', '5':'Five', '6':'Six', '7':'Seven', '8':'Eight', '9':'Nine',
+}
+NATO_DEC = {v.lower(): k for k, v in NATO_ENC.items()}
+
+# before you ask me, no, i do not know why zalgo exists.
+
+ZALGO_UP   = ['̍','̎','̄','̅','̿','̑','̆','̐','͒','͗','͑','̇','̈','̊','͂','̓']
+ZALGO_MID  = ['͉','͈','͍','͎','̣','̤','̩','̪','̻','̼','͓','͔']
+ZALGO_DOWN = ['̖','̗','̘','̙','̜','̝','̞','̟','̠','̤','̥','̦']
+
+# please note that the below list was compiled with the help of AI and is not exhaustive, but it should cover most common encodings and ciphers, as well as some more obscure ones for fun.
+
+ENCODE_METHODS = [
+    ("Base64", "base64"),
+    ("Base64 URL-safe", "base64url"),
+    ("Base32", "base32"),
+    ("Base58", "base58"),
+    ("Base85", "base85"),
+    ("ASCII85", "ascii85"),
+    ("URL Encode", "url"),
+    ("URL Encode (full)", "url_full"),
+    ("HTML Entities", "html"),
+    ("Hex", "hex"),
+    ("Binary", "binary"),
+    ("Octal", "octal"),
+    ("Caesar Cipher", "caesar"),
+    ("ROT13", "rot13"),
+    ("ROT47", "rot47"),
+    ("Morse Code", "morse"),
+    ("JWT (none alg)", "jwt"),
+    ("MD5 Hash", "md5"),
+    ("SHA-1 Hash", "sha1"),
+    ("SHA-256 Hash", "sha256"),
+    ("SHA-512 Hash", "sha512"),
+    ("Unicode Escape", "unicode_escape"),
+    ("Punycode", "punycode"),
+    ("Quoted-Printable", "qp"),
+    ("Bacon Cipher", "bacon"),
+    ("Atbash Cipher", "atbash"),
+    ("Reverse", "reverse"),
+    ("Zalgo Text", "zalgo"),
+    ("Braille", "braille"),
+    ("NATO Phonetic", "nato"),
+]
+
+HASH_METHODS = {"md5", "sha1", "sha256", "sha512"}
+
+# first actual decode method! b58 is obscure but used in crypto so I had to research quite a bit to laern how to enc/dec it.
+
+def _b58enc(data: bytes) -> str:
+    n = int.from_bytes(data, 'big')
+    res = []
+    while n:
+        n, r = divmod(n, 58)
+        res.append(BASE58_ALPHA[r:r+1].decode())
+    res.reverse()
+    return '1' * (len(data) - len(data.lstrip(b'\x00'))) + ''.join(res)
+
+def _b58dec(s: str) -> bytes:
+    n = 0
+    for c in s:
+        n = n * 58 + BASE58_ALPHA.index(c.encode())
+    res = n.to_bytes((n.bit_length() + 7) // 8, 'big') if n else b''
+    return b'\x00' * (len(s) - len(s.lstrip('1'))) + res
+
+# temp for testing
+
 clear_screen()
 out(blue(LOGO))
 out(dim(f"version {__version__} - by zsharpminor\n"))
-out("")
 input1 = input(dim("enter text to get a basic english score for: "))
 out("")
 out(dim(f"Your English Score for '{input1}' is: {_english_score(input1)}."))
+out("")
+out(blue("That encrypted in B58 is: ") + _b58enc(input1.encode()))
+out(blue("And back from B58 is: ") + _b58dec(_b58enc(input1.encode())).decode())
+out("")
