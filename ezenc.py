@@ -283,7 +283,7 @@ def encode(text: str, method: str, caesar_shift: int = 13) -> str:
         return text.encode('unicode_escape').decode('ascii')
     if method == "punycode":
         try:
-            return text.encode('punnycode').decode('ascii')
+            return text.encode('punycode').decode('ascii')
         except Exception:
             return text
     if method == "qp":
@@ -456,10 +456,34 @@ def _try_one(text: str, method: str) -> str | None:
 clear_screen()
 out(blue(LOGO))
 out(dim(f"version {__version__} - by zsharpminor\n"))
-input1 = input(dim("enter text to get a basic english score for: "))
+try:
+    text = input(dim("enter text to decode: ")).strip()
+except KeyboardInterrupt:
+    out(""); raise SystemExit
 out("")
-out(dim(f"Your English Score for '{input1}' is: {_english_score(input1)}."))
-out("")
-out(blue("That encrypted in B58 is: ") + _b58enc(input1.encode()))
-out(blue("And back from B58 is: ") + _b58dec(_b58enc(input1.encode())).decode())
+results = []
+for name, method in ENCODE_METHODS:
+    if method in HASH_METHODS:
+        continue
+    decoded = _try_one(text, method)
+    if decoded:
+        score = _confidence(decoded, text)
+        if score > 0:
+            results.append((score, name, method, decoded))
+results.sort(reverse=True)
+if not results:
+    out(yellow("no decodings found with sufficient confidence."))
+else:
+    out(bold(f"found {len(results)} possible decoding(s):\n"))
+    for i, (score, name, method, decoded) in enumerate(results):
+        label = green(f"[{i+1}] {name}") + dim(f"  (confidence: {score:.2f})")
+        out(label)
+        out(f"    {decoded[:200]}")
+        out("")
+    try:
+        pick = input(dim("copy a result? enter number (or enter to skip): ")).strip()
+        if pick.isdigit() and 1 <= int(pick) <= len(results):
+            _copy(results[int(pick)-1][3])
+    except KeyboardInterrupt:
+        pass
 out("")
