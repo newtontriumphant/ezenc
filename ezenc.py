@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys, os, re, base64, hashlib, signal, platform, unicodedata
 import urllib.parse, html, codecs
 
-__version__ = "1.0.2"
+__version__ = "1.0.4"
 
 # i love ascii generators i should make a tui one of those next!
 
@@ -451,39 +451,98 @@ def _try_one(text: str, method: str) -> str | None:
         return None
     return None
 
-# that took forever, time to test!
+# that took forever, on to detections!
+
+def _detect_format(text: str) -> str | None:
+    t = text.strip()
+    if len(t) > 0 and any(unicodedata.category(c) == 'Mn' for c in t):
+        stripped = _strip_zalgo(t)
+        if stripped and _is_printable_str(stripped):
+            return "zalgo"
+    if len(t) > 0 and all('\u2800' <= c <= '\u28ff' or c == ' ' for c in t):
+        return "braille"
+    parts = t.upper().split()
+    if len(parts) >= 1 and all(re.fullmatch(r'[AB]{5}', p) for p in parts):
+        return "bacon"
+    if re.fullmatch(r'[.\- /]+', t) and ('.' in t or '-' in t):
+        return "morse"
+    if re.fullmatch(r'[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]*', t):
+        return "jwt"
+    if '%' in t and re.search(r'%[0-9a-fA-F]{2}', t):
+        return "url"
+    if '&' in t and ';' in t and re.search(r'&[a-zA-Z]+;|&#\d+;', t):
+        return "html"
+    tokens = t.split()
+    if len(tokens) >= 2:
+        nato_lower = {v.lower() for v in NATO_ENC.values()}
+        if all(tok.lower().rstrip('.,!?') in nato_lower for tok in tokens):
+            return "nato"
+    sparts = t.split()
+    if len(sparts) > 1 and all(re.fullmatch(r'[0-7]{1,3}', p) for p in sparts):
+        return "octal"
+    if re.search(r'\\x[0-9a-fA-F]{2}|\\u[0-9a-fA-F]{4}', t):
+        return "unicode_escape"
+    if re.search(r'=[0-9A-F]{2}', t) and '=' in t:
+        return "qp"
+    clean_hex = t.replace(' ', '').replace('0x', '').replace('\\x', '')
+    if re.fullmatch(r'[0-9a-fA-F]+', clean_hex) and len(clean_hex) >= 4 and len(clean_hex) % 2 == 0:
+        return "hex"
+    # saving the easiest for last
+    if re.fullmatch(r'[A-Z2-7]+=*', t) and len(t) >= 8 and len(t) % 8 == 0:
+        return "base32"
+    b64c = re.sub(r'\s', '', t)
+    if re.fullmatch(r'[A-Za-z0-9+/]+=*', b64c) and len(b64c) >= 8 and len(b64c) % 4 == 0:
+        return "base64"
+    
+    return None
+
+# if none of them autodetect try forcing it in this order until an english score works (ai was used for input on which should go first to maximise computing power / time)
+
+FALLBACK_ORDER = [
+    "zalgo", "morse", "binary", "hex", "jwt", "url", "html", "base32", "bacon", "braille", "nato", "octal", "base64", "base64url", "unicode_escape", "base58", "base85", "qp", "ascii85", "punycode", "rot13", "rot47", "atbash", "reverse", "caesar",
+]
 
 clear_screen()
 out(blue(LOGO))
 out(dim(f"version {__version__} - by zsharpminor\n"))
+
 try:
     text = input(dim("enter text to decode: ")).strip()
 except KeyboardInterrupt:
     out(""); raise SystemExit
+
 out("")
-results = []
-for name, method in ENCODE_METHODS:
-    if method in HASH_METHODS:
-        continue
-    decoded = _try_one(text, method)
-    if decoded:
-        score = _confidence(decoded, text)
-        if score > 0:
-            results.append((score, name, method, decoded))
-results.sort(reverse=True)
+# try auto-detect first, then fallback order after
+detected = _detect_format(text)
+ordered_methods = (
+    [(detected, next(n for n, m in ENCODE_METHODS if m == detected))] +
+    [(m, next((n for n, x in ENCODE_METHODS if x == m), m)) for m in FALLBACK_ORDER if m != detected]
+    if detected else
+    [(m, next((n for n, x in ENCODE_METHODS if x == m), m)) for m in FALLBACK_ORDER]
+)
+
+results = [
+    (score, name, method, decoded)
+    for method, name in ordered_methods
+    if method not in HASH_METHODS
+    and (decoded := _try_one(text, method))
+    and (score := _confidence(decoded, text)) > 0
+]
+
 if not results:
     out(yellow("no decodings found with sufficient confidence."))
 else:
+    if detected:
+        out(dim(f"auto-detected: ") + green(detected) + "\n")
     out(bold(f"found {len(results)} possible decoding(s):\n"))
     for i, (score, name, method, decoded) in enumerate(results):
-        label = green(f"[{i+1}] {name}") + dim(f"  (confidence: {score:.2f})")
-        out(label)
-        out(f"    {decoded[:200]}")
-        out("")
+        out(green(f"[{i+1}] {name}") + dim(f"  (confidence: {score:.2f})"))
+        out(f"    {decoded[:200]}\n")
     try:
         pick = input(dim("copy a result? enter number (or enter to skip): ")).strip()
         if pick.isdigit() and 1 <= int(pick) <= len(results):
-            _copy(results[int(pick)-1][3])
+            _copy(results[int(pick) - 1][3])
     except KeyboardInterrupt:
         pass
+
 out("")
