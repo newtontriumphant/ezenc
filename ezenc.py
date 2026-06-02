@@ -502,6 +502,29 @@ FALLBACK_ORDER = [
     "zalgo", "morse", "binary", "hex", "jwt", "url", "html", "base32", "bacon", "braille", "nato", "octal", "base64", "base64url", "unicode_escape", "base58", "base85", "qp", "ascii85", "punycode", "rot13", "rot47", "atbash", "reverse", "caesar",
 ]
 
+def smart_decode(text: str) -> tuple[str, str] | None:
+    detected = _detect_format(text)
+    if detected:
+        result = _try_one(text, detected)
+        if result and _is_printable_str(result):
+            label = next((n for n, k in ENCODE_METHODS if k == detected), detected)
+            return (label, result)
+    best_score, best_label, best_result = 0.0, None, None
+    for method in FALLBACK_ORDER:
+        if method == detected:
+            continue
+        result = _try_one(text, method)
+        if result and _is_printable_str(result):
+            score = _confidence(result, text)
+            if method in {"url", "html", "unicode_escape", "qp", "zalgo", "bacon", "morse", "braille", "nato", "jwt", "hex", "binary", "octal", "base64", "base32", "base64url", "base58", "base85", "ascii85", "punycode"}:
+                score += 0.15 # since more likely to be correct if it decodes properly and is printable
+            if score > best_score:
+                best_score = score
+                best_result = result
+                best_label = next((n for n, k in ENCODE_METHODS if k == method), method)
+
+    return (best_label, best_result) if best_result and best_score > 0.0
+
 clear_screen()
 out(blue(LOGO))
 out(dim(f"version {__version__} - by zsharpminor\n"))
