@@ -589,6 +589,45 @@ def encode_menu():
             _copy(result)
             _pause()
 
+def decode_menu():
+    clear_screen()
+    out(lblue(LOGO))
+    out(bold("  -- Smart Decode ------------\n"))
+    out(dim("  enter text to decode and we'll try to figure it out! >w<"))
+    out()
+    try:
+        text = input(blue("  --> "))
+    except (EOFError, KeyboardInterrupt):
+        return
+    if text.strip():
+        decode_result(text)
+
+def decode_result(text: str):
+    clear_screen()
+    out(lblue(LOGO))
+    out(bold("  -- Smart Decode ------------\n"))
+    hit = smart_decode(text)
+    if not hit:
+        out(red("  sorry, couldn't detect any encoding! may be either plain text or an unsupported format :c"))
+        _pause()
+        return
+    label, result = hit
+    out(green(f"  detected format: {bold(label)}\n"))
+    out(blue("  -- decoded ------------"))
+    out()
+    for line in result.split('\n'):
+        out(f"  {line}")
+    out()
+    out(blue("  ----------------------"))
+    out(f"\n  {bold('c')} copy    {bold('enter')} back\n")
+    try:
+        act = input(blue("  --> ")).strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        act = ""
+    if act == "c":
+        _copy(result)
+        _pause()
+
 def main_menu():
     while True:
         clear_screen()
@@ -596,7 +635,7 @@ def main_menu():
 
 def main():
     signal.signal(signal.SIGINT, lambda *_: (print(), sys.exit(0)))
-    main_menu()
+    encode_menu()
 
 if __name__ == "__main__":
     main()
