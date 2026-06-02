@@ -523,49 +523,43 @@ def smart_decode(text: str) -> tuple[str, str] | None:
                 best_result = result
                 best_label = next((n for n, k in ENCODE_METHODS if k == method), method)
 
-    return (best_label, best_result) if best_result and best_score > 0.0
+    return (best_label, best_result) if best_result and best_score > 0.0 else None
 
-clear_screen()
-out(blue(LOGO))
-out(dim(f"version {__version__} - by zsharpminor\n"))
+def choose_method() -> tuple[str, str] | None:
+    while True:
+        clear_screen()
+        out(lblue(LOGO))
+        out(bold("  -- Encode - choose method ------------\n"))
+        for i, (label, _) in enumerate(ENCODE_METHODS, 1):
+            out(f"  {bold(str(i).rjust(2) + '.')} {label}")
+            out()
+            out(dim("  type a number, or q to go back"))
+            out()
+            try:
+                choice = input(blue("  --> ")).strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                return None
+            if choice == 'q':
+                return None
+            if choice.isdigit():
+                n = int(choice)
+                if 1 <= n <= len(ENCODE_METHODS):
+                    return ENCODE_METHODS[n - 1]
+            
+def encode_menu():
+    while True:
+        picked = choose_method()
+        if not picked:
+            return
 
-try:
-    text = input(dim("enter text to decode: ")).strip()
-except KeyboardInterrupt:
-    out(""); raise SystemExit
+def main_menu():
+    while True:
+        clear_screen()
+        out(lblue(LOGO))
 
-out("")
-# try auto-detect first, then fallback order after
-detected = _detect_format(text)
-ordered_methods = (
-    [(detected, next(n for n, m in ENCODE_METHODS if m == detected))] +
-    [(m, next((n for n, x in ENCODE_METHODS if x == m), m)) for m in FALLBACK_ORDER if m != detected]
-    if detected else
-    [(m, next((n for n, x in ENCODE_METHODS if x == m), m)) for m in FALLBACK_ORDER]
-)
+def main():
+    signal.signal(signal.SIGINT, lambda *_: (print(), sys.exit(0)))
+    main_menu()
 
-results = [
-    (score, name, method, decoded)
-    for method, name in ordered_methods
-    if method not in HASH_METHODS
-    and (decoded := _try_one(text, method))
-    and (score := _confidence(decoded, text)) > 0
-]
-
-if not results:
-    out(yellow("no decodings found with sufficient confidence."))
-else:
-    if detected:
-        out(dim(f"auto-detected: ") + green(detected) + "\n")
-    out(bold(f"found {len(results)} possible decoding(s):\n"))
-    for i, (score, name, method, decoded) in enumerate(results):
-        out(green(f"[{i+1}] {name}") + dim(f"  (confidence: {score:.2f})"))
-        out(f"    {decoded[:200]}\n")
-    try:
-        pick = input(dim("copy a result? enter number (or enter to skip): ")).strip()
-        if pick.isdigit() and 1 <= int(pick) <= len(results):
-            _copy(results[int(pick) - 1][3])
-    except KeyboardInterrupt:
-        pass
-
-out("")
+if __name__ == "__main__":
+    main()
