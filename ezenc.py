@@ -312,7 +312,146 @@ def encode(text: str, method: str, caesar_shift: int = 13) -> str:
 
 # phew, that took a while! before going onto decode i needa sub it tho
 
-# PLACEHOLDER: decode subs
+def _decode_substitution(text: str, method:  str) -> str | None:
+    t = text.strip()
+    try:
+        if method == "rot13":
+            r = codecs.decode(t, 'rot_13')
+        elif method == "rot47":
+            r = ''.join(chr(33 + (ord(c) - 33 - 47) % 94) if 33 <= ord(c) <= 126 else c for c in t)
+        elif method == "atbash":
+            r = ''.join(_atbash_char(c) for c in t)
+        elif method == "reverse":
+            r = t[::-1]
+        else:
+            return None
+    except Exception:
+        return None
+    if r == t:
+        return None # no change means likely not correct
+    return r if _english_score(r) >= 0.20 else None # smart decode tryna figure out if result is english or not!
+
+def _decode_caesar_smart(text: str) -> tuple[str, int] | None:
+    best_score, best_dec, best_shift = 0.0, None, None
+    for shift in range(1, 26):
+        dec = ''.join(chr((ord(c) - (65 if c.isupper() else 97) - shift) % 26 + (65 if c.isupper() else 97)) if c.isalpha() else c for c in text)
+        score = _english_score(dec)
+        if score > best_score:
+            best_score, best_dec, best_shift = score, dec, shift
+    if best_dec and best_score >= 0.20 and best_dec != text:
+        return (best_dec, best_shift)
+    return None
+
+def _decode_nato(text: str) -> str | None:
+    tokens = text.strip().split()
+    if not tokens:
+        return None
+    result = []
+    for tok in tokens:
+        key = tok.lower().rstrip('.,!?')
+        if key in NATO_DEC:
+            result.append(NATO_DEC[key])
+        else:
+            return None
+    return ''.join(result) if result else None
+
+# the below is partially AI-assisted (copilot autocomplete only)
+
+def _try_one(text: str, method: str) -> str | None:
+    t = text.strip()
+    try:
+        if method == "base64":
+            pad = (4 - len(t) % 4) % 4
+            r = base64.b64decode(t + '=' * pad).decode('utf-8')
+            return r if r != t else None
+        if method == "base64url":
+            pad = (4 - len(t) % 4) % 4
+            r = base64.urlsafe_b64decode(t + '=' * pad).decode('utf-8')
+            return r if r != t else None
+        if method == "base32":
+            pad = (8 - len(t) % 8) % 8
+            r = base64.b32decode(t + '=' * pad).decode('utf-8')
+            return r if r != t else None
+        if method == "base58":
+            return _b58dec(t).decode('utf-8')
+        if method == "base85":
+            return base64.b85decode(t).decode('utf-8')
+        if method == "ascii85":
+            return base64.a85decode(t).decode('utf-8')
+        if method == "url":
+            r = urllib.parse.unquote(t)
+            return r if r != t else None
+        if method == "html":
+            r = html.unescape(t)
+            return r if r != t else None
+        if method == "hex":
+            clean = t.replace(' ', '').replace('0x', '').replace('\\x', '')
+            if not re.fullmatch(r'[0-9a-fA-F]+', clean) or len(clean) % 2 != 0:
+                return None
+            return bytes.fromhex(clean).decode('utf-8')
+        if method == "binary":
+            parts = t.split()
+            if not all(re.fullmatch(r'[01]{1,8}', p) for p in parts):
+                return None
+            return ''.join(chr(int(p, 2)) for p in parts)
+        if method == "octal":
+            parts = t.split()
+            if not all(re.fullmatch(r'[0-7]+', p) for p in parts):
+                return None
+            return ''.join(chr(int(p, 8)) for p in parts)
+        if method == "morse":
+            if not re.fullmatch(r'[.\- /]+', t):
+                return None
+            words = t.split(' / ')
+            out_words = []
+            for w in words:
+                chars = w.split()
+                dec = ''.join(MORSE_DEC.get(c, '?') for c in chars)
+                if '?' in dec:
+                    return None
+                out_words.append(dec)
+            return ' '.join(out_words)
+        if method == "unicode_escape":
+            r = t.encode('ascii').decode('unicode_escape')
+            return r if r != t else None
+        if method == "bacon":
+            parts = t.upper().split()
+            if not all(re.fullmatch(r'[AB]{5}', p) for p in parts):
+                return None
+            r = ''.join(BACON_DEC.get(p, '?') for p in parts)
+            return r if '?' not in r else None
+        if method == "braille":
+            r = ''.join(BRAILLE_DEC.get(c, c) for c in t)
+            return r if r != t else None
+        if method == "jwt":
+            parts = t.split('.')
+            if len(parts) < 2:
+                return None
+            pad = (4 - len(parts[1]) % 4) % 4
+            return base64.urlsafe_b64decode(parts[1] + '=' * pad).decode('utf-8')
+        if method == "qp":
+            import quopri
+            r = quopri.decodestring(t.encode()).decode('utf-8')
+            return r if r != t else None
+        if method == "punycode":
+            r = t.encode('ascii').decode('punycode')
+            return r if r != t else None
+        if method == "nato":
+            return _decode_nato(t)
+        if method == "zalgo":
+            return _strip_zalgo(t)
+        if method in ("rot13", "rot47", "atbash", "reverse"):
+            return _decode_substitution(t, method)
+        if method == "caesar":
+            hit = _decode_caesar_smart(t)
+            return f"{hit[0]}  (shift {hit[1]})" if hit else None
+        if method in HASH_METHODS:
+            return None # can't decode hashes
+    except Exception:
+        return None
+    return None
+
+# that took forever, time to test!
 
 clear_screen()
 out(blue(LOGO))
