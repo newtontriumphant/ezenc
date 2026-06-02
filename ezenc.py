@@ -539,7 +539,7 @@ def choose_method() -> tuple[str, str] | None:
                 choice = input(blue("  --> ")).strip().lower()
             except (EOFError, KeyboardInterrupt):
                 return None
-            if choice == 'q':
+            if choice in {"q", "quit", "back", "exit"}:
                 return None
             if choice.isdigit():
                 n = int(choice)
@@ -549,8 +549,45 @@ def choose_method() -> tuple[str, str] | None:
 def encode_menu():
     while True:
         picked = choose_method()
-        if not picked:
+        if picked is None:
             return
+        label, method = picked
+        clear_screen()
+        out(lblue(LOGO))
+        out(bold(f"  -- {label} ------------\n"))
+
+        caesar_shift = 13 # using 13 as default since it's the statistic most likely :3
+        if method == "caesar":
+            try:
+                raw = input(blue("  shift amount (default: 13): ")).strip()
+                caesar_shift = int(raw) if raw else 13
+            except (ValueError, EOFError, KeyboardInterrupt):
+                caesar_shift = 13
+
+        out(dim("  enter text to encode:"))
+        try:
+            text = input(blue("  --> "))
+        except (EOFError, KeyboardInterrupt):
+            continue
+        if not text.strip():
+            continue
+
+        result = encode(text, method, caesar_shift)
+        out()
+        out(blue("  -- result ------------"))
+        out()
+        for i in range (0, len(result), 100):
+            out(f"  {result[i:i+100]}")
+        out()
+        out(blue("  ----------------------"))
+        out(f"\n  {bold('c')} copy    {bold('enter')} back\n")
+        try:
+            act = input(blue("  --> ")).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            act = ""
+        if act == "c":
+            _copy(result)
+            _pause()
 
 def main_menu():
     while True:
