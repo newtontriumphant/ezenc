@@ -220,7 +220,99 @@ def _b58dec(s: str) -> bytes:
     res = n.to_bytes((n.bit_length() + 7) // 8, 'big') if n else b''
     return b'\x00' * (len(s) - len(s.lstrip('1'))) + res
 
-# temp for testing
+def _atbash_char(c: str) -> str:
+    if c.isupper():
+        return chr(90 - (ord(c) - 65))
+    if c.islower():
+        return chr(122 - (ord(c) - 97))
+    return c
+
+def _strip_zalgo(text: str) -> str:
+    stripped = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
+    return stripped if stripped != text else None
+
+# i'm sick of doing all of these manually so i'm going to use a helper
+
+def encode(text: str, method: str, caesar_shift: int = 13) -> str:
+    b = text.encode('utf-8')
+    if method == "base64":
+        return base64.b64encode(b).decode()
+    if method == "base64url":
+        return base64.urlsafe_b64encode(b).decode()
+    if method == "base32":
+        return base64.b32encode(b).decode()
+    if method == "base58":
+        return _b58enc(b)
+    if method == "base85":
+        return base64.b85encode(b).decode()
+    if method == "ascii85":
+        return base64.a85encode(b).decode()
+    if method == "url":
+        return urllib.parse.quote(text, safe='~-._')
+    if method == "url_full":
+        return urllib.parse.quote(text, safe='')
+    if method == "html":
+        return html.escape(text, quote=True)
+    if method == "hex":
+        return b.hex()
+    if method == "binary":
+        return ' '.join(format(x, '08b') for x in b)
+    if method == "octal":
+        return ' '.join(format(x, 'o') for x in b)
+    if method == "caesar":
+        return ''.join(chr((ord(c) - (65 if c.isupper() else 97) + caesar_shift) % 26 + (65 if c.isupper() else 97)) if c.isalpha() else c for c in text)
+    if method == "rot13":
+        return codecs.encode(text, 'rot_13')
+    if method == "rot47":
+        return ''.join(chr(33 + (ord(c) - 33 + 47) % 94) if 33 <= ord(c) <= 126 else c for c in text)
+    if method == "morse":
+        return ' '.join(MORSE_ENC.get(c.upper(), '?') for c in text)
+    if method == "jwt":
+        h = base64.urlsafe_b64encode(b'{"alg":"none","typ":"JWT"}').rstrip(b'=').decode()
+        p = base64.urlsafe_b64encode(b).rstrip(b'=').decode()
+        return f"{h}.{p}."
+    if method == "md5":
+        return hashlib.md5(b).hexdigest()
+    if method == "sha1":
+        return hashlib.sha1(b).hexdigest()
+    if method == "sha256":
+        return hashlib.sha256(b).hexdigest()
+    if method == "sha512":
+        return hashlib.sha512(b).hexdigest()
+    if method == "unicode_escape":
+        return text.encode('unicode_escape').decode('ascii')
+    if method == "punycode":
+        try:
+            return text.encode('punnycode').decode('ascii')
+        except Exception:
+            return text
+    if method == "qp":
+        import quopri
+        return quopri.encodestring(b).decode()
+    if method == "bacon":
+        return ' '.join(BACON_ENC.get(c.upper(), c) for c in text)
+    if method == "atbash":
+        return ''.join(_atbash_char(c) for c in text)
+    if method == "reverse":
+        return text[::-1]
+    if method == "zalgo":
+        import random
+        res = []
+        for c in text:
+            res.append(c)
+            for lst in [ZALGO_UP, ZALGO_MID, ZALGO_DOWN]:
+                for _ in range(random.randint(0, 2)):
+                    res.append(random.choice(lst))
+        return ''.join(res) # so funny how zalgo is literally random crap thrown on top of text sob
+    if method == "braille":
+        return ''.join(BRAILLE_ENC.get(c.lower(), c) for c in text)
+    if method == "nato":
+        return ' '.join(NATO_ENC.get(c.upper(), c) for c in text)
+    return text
+
+# phew, that took a while! before going onto decode i needa sub it tho
+
+# PLACEHOLDER: decode subs
 
 clear_screen()
 out(blue(LOGO))
