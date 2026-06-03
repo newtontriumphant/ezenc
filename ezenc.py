@@ -42,7 +42,7 @@ def clear_screen():
 def _pause():
     try:
         input(dim("\n press enter to continue..."))
-    except KeyboardInterrupt:
+    except (EOFError, KeyboardInterrupt):
         pass
 
 def _copy(text):
@@ -51,19 +51,19 @@ def _copy(text):
     try:
         if s == "Darwin":
             subprocess.run(["pbcopy"], input=text.encode(), check=True)
-            out(green("copied! :D"))
+            out(green("  copied! :D"))
         elif s == "Linux":
             if sh.which("xclip"):
                 subprocess.run(["xclip", "-selection", "clipboard"], input=text.encode(), check=True)
-                out(green("copied! :D"))
+                out(green("  copied! :D"))
             elif sh.which("xsel"):
                 subprocess.run(["xsel", "--clipboard", "--input"], input=text.encode(), check=True)
-                out(green("copied! :D"))
+                out(green("  copied! :D"))
             else:
-                out(red("no clipboard utility found (install xclip or xsel)!!"))
+                out(red("  no clipboard utility found (install xclip or xsel)!!"))
         elif s == "Windows":
             subprocess.run(["clip"], input=text.encode("utf-16"), check=True)
-            out(green("copied! :D"))
+            out(green("  copied! :D"))
     except Exception as e:
         out(yellow(f"clipboard failed: {e}"))
 
@@ -134,7 +134,7 @@ MORSE_ENC = {
 MORSE_DEC = {v: k for k, v in MORSE_ENC.items()}
 
 # why the #ysws-fraud-fudgeudgefudge does the bacon cipher exist sob
-BACON_ENC = {c: format(i, '05b').replace('0', 'A').replace('1', 'B') for i, c in enumerate("ABCDEFGHIJKLMNOPQRSTUVWXYZ")}
+BACON_ENC = {c: format(i, '05b').replace('0','A').replace('1','B') for i, c in enumerate('ABCDEFGHIKLMNOPQRSTUWXYZ')}
 BACON_ENC['J'] = BACON_ENC['I']
 BACON_ENC['V'] = BACON_ENC['U']
 BACON_DEC = {}
@@ -152,7 +152,7 @@ BRAILLE_DEC = {v: k for k, v in BRAILLE_ENC.items()}
 
 NATO_ENC = {
     'A':'Alpha', 'B':'Bravo', 'C':'Charlie', 'D':'Delta', 'E':'Echo', 'F':'Foxtrot', 'G':'Golf', 'H':'Hotel',
-    'I':'India', 'J':'Juliett', 'K':'Kilo', 'L':'Lima', 'M':'Mike', 'N':'November', 'O':'Oscar', 'P':'Papa',
+    'I':'India', 'J':'Juliet', 'K':'Kilo', 'L':'Lima', 'M':'Mike', 'N':'November', 'O':'Oscar', 'P':'Papa',
     'Q':'Quebec', 'R':'Romeo', 'S':'Sierra', 'T':'Tango', 'U':'Uniform', 'V':'Victor', 'W':'Whiskey',
     'X':'X-ray', 'Y':'Yankee', 'Z':'Zulu',
     '0':'Zero', '1':'One', '2':'Two', '3':'Three', '4':'Four', '5':'Five', '6':'Six', '7':'Seven', '8':'Eight', '9':'Nine',
@@ -318,7 +318,7 @@ def _decode_substitution(text: str, method:  str) -> str | None:
         if method == "rot13":
             r = codecs.decode(t, 'rot_13')
         elif method == "rot47":
-            r = ''.join(chr(33 + (ord(c) - 33 - 47) % 94) if 33 <= ord(c) <= 126 else c for c in t)
+            r = ''.join(chr(33 + (ord(c) - 33 + 47) % 94) if 33 <= ord(c) <= 126 else c for c in t)
         elif method == "atbash":
             r = ''.join(_atbash_char(c) for c in t)
         elif method == "reverse":
@@ -370,7 +370,7 @@ def _try_one(text: str, method: str) -> str | None:
             return r if r != t else None
         if method == "base32":
             pad = (8 - len(t) % 8) % 8
-            r = base64.b32decode(t + '=' * pad).decode('utf-8')
+            r = base64.b32decode(t.upper() + '=' * pad).decode('utf-8')
             return r if r != t else None
         if method == "base58":
             return _b58dec(t).decode('utf-8')
@@ -466,6 +466,8 @@ def _detect_format(text: str) -> str | None:
         return "bacon"
     if re.fullmatch(r'[.\- /]+', t) and ('.' in t or '-' in t):
         return "morse"
+    if re.fullmatch(r'[01]{8}( [01]{8})*', t):
+        return "binary"
     if re.fullmatch(r'[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]*', t):
         return "jwt"
     if '%' in t and re.search(r'%[0-9a-fA-F]{2}', t):
@@ -532,19 +534,19 @@ def choose_method() -> tuple[str, str] | None:
         out(bold("  -- Encode - choose method ------------\n"))
         for i, (label, _) in enumerate(ENCODE_METHODS, 1):
             out(f"  {bold(str(i).rjust(2) + '.')} {label}")
-            out()
-            out(dim("  type a number, or q to go back"))
-            out()
-            try:
-                choice = input(blue("  --> ")).strip().lower()
-            except (EOFError, KeyboardInterrupt):
-                return None
-            if choice in {"q", "quit", "back", "exit"}:
-                return None
-            if choice.isdigit():
-                n = int(choice)
-                if 1 <= n <= len(ENCODE_METHODS):
-                    return ENCODE_METHODS[n - 1]
+        out()
+        out(dim("  type a number, or q to go back"))
+        out()
+        try:
+            choice = input(blue("  --> ")).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            return None
+        if choice in {"q", "quit", "back", "exit"}:
+            return None
+        if choice.isdigit():
+            n = int(choice)
+            if 1 <= n <= len(ENCODE_METHODS):
+                return ENCODE_METHODS[n - 1]
             
 def encode_menu():
     while True:
@@ -652,6 +654,10 @@ def main_menu():
             break
         elif choice:
             decode_result(choice)
+
+    out()
+    out(red("goodbye! >:c"))
+    out()
 
 def main():
     signal.signal(signal.SIGINT, lambda *_: (print(), sys.exit(0)))
