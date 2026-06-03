@@ -3,11 +3,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ezenc"
-version = "1.0.5"
-description = "encode / decode anything! :3"
+name = "ez-encrypt"
+version = "1.0.6"
+description = "encode / decode anything"
 requires-python = ">=3.10"
 readme = "README.md"
 
 [project.scripts]
-ezenc = "ezenc.__main__:main"
+ez-encrypt = "ezenc.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ezenc"]

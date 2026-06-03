@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys, os, re, base64, hashlib, signal, platform, unicodedata
 import urllib.parse, html, codecs
 
-__version__ = "1.0.5"
+__version__ = "1.0.6"
 
 # i love ascii generators i should make a tui one of those next!
 

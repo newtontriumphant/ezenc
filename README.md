@@ -2,9 +2,11 @@
 
 Hiya and welcome!
 
-ezenc / ez-encoder is a simple software made entirely in Python that lets you encode / decode anything: base64, hex, morse, JWT, ROT13, and more.
+ezenc / ez-encrypt is a simple software made entirely in Python that lets you encode / decode anything: base64, hex, morse, JWT, ROT13, and more.
 
 ![ezenc logo!](https://cdn.hackclub.com/019e8b09-f7da-7f68-ab6a-c80b39f176ab/screenshot_2026-06-02_at_6.12.19___pm.png)
+
+Before we dive in, the demo link for ezenc can be found here: https://pypi.org/project/ez-encrypt/ :D
 
 ## About
 
@@ -24,13 +26,16 @@ Make sure you have `pip`, Python 3.10+, and `pipx` installed for best results! :
 
 ```bash
 # run without installing
-pipx run ezenc
+pipx run ez-encrypt
 
 # or install permanently (either works) :3
-pipx install ezenc
-pip install ezenc
+pipx install ez-encrypt
+pip install ez-encrypt
 ```
 
-bonus: `cW-wrAbD?fAYo&4bzy95c_4IeZ)+fQXk{RDX>Da7bZ;POZgX^DY-}K9dSz~7AYpD~AY^4@Z)9a4bZBXFKOku!Y;SgDAbDXSAZ~AWAZKZIWgv8DX>%ZQWpHmGVIXsKVRC)` >:D
+bonus :D
+```bash
+cW-wrAbD?fAYo&4bzy95c_4IeZ)+fQXk{RDX>Da7bZ;POZgX^DY-}K9dSz~7AYpD~AY^4@Z)9a4bZBXFKOku!Y;SgDAbDXSAZ~AWAZKZIWgv8DX>%ZQWpHmGVIXsKVRC)
+```
 
 Made with ♡ by zsharpminor for Hack Club Stardance!
