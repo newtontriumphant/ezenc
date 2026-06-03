@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys, os, re, base64, hashlib, signal, platform, unicodedata
 import urllib.parse, html, codecs
 
-__version__ = "1.0.4"
+__version__ = "1.0.5"
 
 # i love ascii generators i should make a tui one of those next!
 
@@ -41,7 +41,7 @@ def clear_screen():
 
 def _pause():
     try:
-        input(dim("\n press enter to continue..."))
+        input(dim("\n  press enter to continue..."))
     except (EOFError, KeyboardInterrupt):
         pass
 

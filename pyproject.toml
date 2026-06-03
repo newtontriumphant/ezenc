@@ -1,0 +1,13 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ezenc"
+version = "1.0.5"
+description = "encode / decode anything! :3"
+requires-python = ">=3.10"
+readme = "README.md"
+
+[project.scripts]
+ezenc = "ezenc.__main__:main"
